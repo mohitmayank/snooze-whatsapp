@@ -1,6 +1,6 @@
 # Absolute Work Board — Snooze WhatsApp
 **Created**: 2026-06-30  
-**Status**: in_progress  
+**Status**: in_progress — reopened 2026-07-01 (AW-013/014 test coverage gaps found; AW-015/016/017 tail checklists never actually run)  
 **Rollback Point**: (recorded before Wave 1 touches any source files)
 
 ---
@@ -61,7 +61,7 @@ AW-001 (dev env)
 ## Tasks
 
 ### AW-001 — Android Dev Environment Setup
-- **Type**: infra | **Size**: S | **Deps**: none | **Status**: `todo`
+- **Type**: infra | **Size**: S | **Deps**: none | **Status**: `completed`
 - **Description**: Install Android Studio (snap), Android SDK Platform 34, Build-Tools 34, Platform-Tools (adb). Add adb to PATH in `.zshrc`. Initialize git repo in project directory.
 - **Files**: `~/.zshrc` (PATH), system-level installs only — no project files touched
 - **Acceptance criteria**:
@@ -74,7 +74,7 @@ AW-001 (dev env)
 ---
 
 ### AW-002 — Android Project Scaffold
-- **Type**: infra | **Size**: M | **Deps**: AW-001 | **Status**: `todo`
+- **Type**: infra | **Size**: M | **Deps**: AW-001 | **Status**: `completed`
 - **Description**: Create the full Gradle Android project structure using Android Studio's "New Project" wizard (or `gradle init`). Configure `build.gradle.kts` with all dependencies, set up `settings.gradle.kts`, create base `AndroidManifest.xml` (permissions + placeholders), add Material 3 theme in `res/`, create placeholder vector drawables `ic_snooze.xml` and `ic_offline.xml`, initialize git and add `.gitignore`.
 - **Files to create**:
   - `app/build.gradle.kts`
@@ -96,7 +96,7 @@ AW-001 (dev env)
 ---
 
 ### AW-003 — PrefsRepository
-- **Type**: code | **Size**: S | **Deps**: AW-002 | **Status**: `todo`
+- **Type**: code | **Size**: S | **Deps**: AW-002 | **Status**: `completed`
 - **Description**: Implement `PrefsRepository.kt` — a SharedPreferences singleton wrapping all persisted state. Exposes typed getters/setters for every key defined in spec §3. Include a `get(context)` companion object factory.
 - **Files**: `app/src/main/kotlin/com/mohit/snoozewhatsapp/data/PrefsRepository.kt`
 - **Test file**: `app/src/test/kotlin/.../data/PrefsRepositoryTest.kt` (written first)
@@ -114,7 +114,7 @@ AW-001 (dev env)
 ---
 
 ### AW-004 — Feature Enum + FeatureController
-- **Type**: code | **Size**: S | **Deps**: AW-003 | **Status**: `todo`
+- **Type**: code | **Size**: S | **Deps**: AW-003 | **Status**: `completed`
 - **Description**: Define `Feature` enum (`SNOOZE`, `OFFLINE`) with per-feature prefs key prefixes. Implement `FeatureController.kt` with `activate(context, feature)` and `deactivate(context, feature)` — these update `PrefsRepository`, start/stop the relevant service (VPN for OFFLINE, accessibility trigger for SNOOZE), and request tile updates.
 - **Files**:
   - `app/src/main/kotlin/.../data/Feature.kt`
@@ -128,7 +128,7 @@ AW-001 (dev env)
 ---
 
 ### AW-005 — WhatsAppVpnService + VpnConflictChecker
-- **Type**: code | **Size**: M | **Deps**: AW-004 | **Status**: `todo`
+- **Type**: code | **Size**: M | **Deps**: AW-004 | **Status**: `completed`
 - **Description**: Implement `WhatsAppVpnService.kt` — a `VpnService` subclass that uses `addAllowedApplication("com.whatsapp")` to route only WhatsApp traffic into the tunnel, then drops all packets (read-loop discards). Add persistent foreground notification "WhatsApp offline". Implement `VpnConflictChecker.kt` that checks `ConnectivityManager` for active `TRANSPORT_VPN`. Add manifest service declaration with `foregroundServiceType="specialUse"`.
 - **Files**:
   - `app/src/main/kotlin/.../vpn/WhatsAppVpnService.kt`
@@ -144,7 +144,7 @@ AW-001 (dev env)
 ---
 
 ### AW-006 — WhatsAppAccessibilityService
-- **Type**: code | **Size**: M | **Deps**: AW-004 | **Status**: `todo`
+- **Type**: code | **Size**: M | **Deps**: AW-004 | **Status**: `completed`
 - **Description**: Implement `WhatsAppAccessibilityService.kt`. On `TYPE_WINDOW_STATE_CHANGED`, check `PrefsRepository.getPendingAction(Feature.SNOOZE)`. If set, navigate the WhatsApp menu tree: find nodes by text (`"Settings"` → `"Account"` → `"Privacy"` → `"Read receipts"` switch) and click. Timeout after 5s → notify user via `NotificationManager`. On success: clear pendingAction, update `snooze_active`, send local broadcast `ACTION_SNOOZE_DONE`. Add manifest declaration referencing `accessibility_service_config.xml`.
 - **Files**:
   - `app/src/main/kotlin/.../accessibility/WhatsAppAccessibilityService.kt`
@@ -158,7 +158,7 @@ AW-001 (dev env)
 ---
 
 ### AW-007 — ScheduleManager
-- **Type**: code | **Size**: M | **Deps**: AW-004 | **Status**: `todo`
+- **Type**: code | **Size**: M | **Deps**: AW-004 | **Status**: `completed`
 - **Description**: Implement `ScheduleManager.kt` — `AlarmManager` wrapper. Methods: `scheduleDurationOff(feature, durationMs)`, `scheduleDailyStart(feature, hour, minute)`, `scheduleDailyEnd(feature, hour, minute)`, `cancelAll(feature)`. Uses `setExactAndAllowWhileIdle` if `canScheduleExactAlarms()`, else `setWindow(±10min)`. Includes `nextOccurrenceOf(hour, minute): Long` helper. All `PendingIntent`s use `FLAG_IMMUTABLE`.
 - **Files**: `app/src/main/kotlin/.../scheduler/ScheduleManager.kt`
 - **Test file**: `app/src/test/kotlin/.../scheduler/ScheduleManagerTest.kt`
@@ -170,7 +170,7 @@ AW-001 (dev env)
 ---
 
 ### AW-008 — ScheduleReceiver + AlarmReceiver
-- **Type**: code | **Size**: S | **Deps**: AW-007 | **Status**: `todo`
+- **Type**: code | **Size**: S | **Deps**: AW-007 | **Status**: `completed`
 - **Description**: Implement `ScheduleReceiver.kt` — handles `ACTION_BOOT_COMPLETED` only; re-registers all active alarms from `PrefsRepository`. Implement `AlarmReceiver.kt` (`exported=false`) — handles `ACTION_DURATION_EXPIRE`, `ACTION_DAILY_START`, `ACTION_DAILY_END`; calls `FeatureController.deactivate/activate` and re-schedules next daily alarm. Add both to manifest.
 - **Files**:
   - `app/src/main/kotlin/.../scheduler/ScheduleReceiver.kt`
@@ -184,7 +184,7 @@ AW-001 (dev env)
 ---
 
 ### AW-009 — StateCorrectWorker
-- **Type**: code | **Size**: S | **Deps**: AW-008 | **Status**: `todo`
+- **Type**: code | **Size**: S | **Deps**: AW-008 | **Status**: `completed`
 - **Description**: Implement `StateCorrectWorker.kt` — a `CoroutineWorker` that checks all features: if `restore_at` is past and feature is still active, deactivates it. Enqueued as `enqueueUniquePeriodicWork("state_correct", KEEP, 15min)` in `SnoozeWhatsAppApp.onCreate()`. Create `SnoozeWhatsAppApp.kt` application class and register in manifest.
 - **Files**:
   - `app/src/main/kotlin/.../scheduler/StateCorrectWorker.kt`
@@ -197,7 +197,7 @@ AW-001 (dev env)
 ---
 
 ### AW-010 — SnoozeTileService + OfflineTileService
-- **Type**: code | **Size**: M | **Deps**: AW-004 | **Status**: `todo`
+- **Type**: code | **Size**: M | **Deps**: AW-004 | **Status**: `completed`
 - **Description**: Implement two `TileService` subclasses. Each holds `prefsListener` as a field (prevents GC). `onStartListening` registers listener + calls `updateTile()`. `onStopListening` unregisters. `onClick` calls `FeatureController.activate/deactivate`. Tile shows `STATE_ACTIVE` (with subtitle), `STATE_INACTIVE`, or `STATE_UNAVAILABLE` (if required permission missing). Add manifest declarations.
 - **Files**:
   - `app/src/main/kotlin/.../tile/SnoozeTileService.kt`
@@ -211,7 +211,7 @@ AW-001 (dev env)
 ---
 
 ### AW-011 — PermissionSetupScreen
-- **Type**: code | **Size**: S | **Deps**: AW-002 | **Status**: `todo`
+- **Type**: code | **Size**: S | **Deps**: AW-002 | **Status**: `completed`
 - **Description**: Compose screen shown on first launch or when any required permission is revoked. Three checklist rows: Accessibility Service, VPN Consent, Exact Alarm (optional). Each row has a "Grant" button deep-linking to relevant settings. Polls `checkPermissions()` in `onResume`. "Continue" button enabled when Accessibility + VPN granted.
 - **Files**: `app/src/main/kotlin/.../ui/PermissionSetupScreen.kt`
 - **Acceptance criteria**:
@@ -222,7 +222,7 @@ AW-001 (dev env)
 ---
 
 ### AW-012 — MainActivity + FeatureCard
-- **Type**: code | **Size**: M | **Deps**: AW-004, AW-007, AW-011 | **Status**: `todo`
+- **Type**: code | **Size**: M | **Deps**: AW-004, AW-007, AW-011 | **Status**: `completed`
 - **Description**: `MainActivity.kt` routes to `PermissionSetupScreen` (if `onboarding_done == false`) or main screen. Main screen: two `FeatureCard` composables parameterized by `Feature`. Each card: title + `Switch` (calls `FeatureController`), `StatusText` (shows remaining time or "Active"), `DurationChips` ([30m][1h][2h][4h][Custom] — calls `ScheduleManager`), `DailyRangePicker` (two `TimePickerDialog` pickers — calls `ScheduleManager`). Compact `PermissionsBanner` shown if any permission missing post-onboarding.
 - **Files**: `app/src/main/kotlin/.../ui/MainActivity.kt`
 - **Acceptance criteria**:
@@ -234,7 +234,7 @@ AW-001 (dev env)
 ---
 
 ### AW-013 — Unit Tests
-- **Type**: test | **Size**: S | **Deps**: AW-003, AW-004, AW-007 | **Status**: `todo`
+- **Type**: test | **Size**: S | **Deps**: AW-003, AW-004, AW-007 | **Status**: `in_progress` (2026-07-01: only ScheduleManagerTest + UiUtilsTest exist; missing PrefsRepositoryTest, FeatureControllerTest, VpnConflictCheckerTest)
 - **Description**: Write JUnit4 unit tests with mocked Android framework (`mockito-core` + `robolectric`). Cover: `PrefsRepository` round-trips, `ScheduleManager.nextOccurrenceOf` edge cases (past time, midnight boundary), `VpnConflictChecker.isVpnActive` with mocked `NetworkCapabilities`.
 - **Files**: `app/src/test/kotlin/com/mohit/snoozewhatsapp/`
 - **Acceptance criteria**:
@@ -245,7 +245,7 @@ AW-001 (dev env)
 ---
 
 ### AW-014 — Instrumented Tests
-- **Type**: test | **Size**: S | **Deps**: AW-005, AW-008 | **Status**: `todo`
+- **Type**: test | **Size**: S | **Deps**: AW-005, AW-008 | **Status**: `todo` (2026-07-01: app/src/androidTest/ does not exist — never implemented)
 - **Description**: Write on-device instrumented tests. `VpnServiceTest`: start `WhatsAppVpnService`, attempt HTTP request from WhatsApp context (mock), verify blocked. `ScheduleReceiverTest`: send `ACTION_BOOT_COMPLETED` broadcast, verify `ScheduleManager.scheduleDailyStart` called for active schedules. UIAutomator node-map snapshot: launch WhatsApp (if installed), dump accessibility tree to logcat for Settings screen.
 - **Files**: `app/src/androidTest/kotlin/com/mohit/snoozewhatsapp/`
 - **Acceptance criteria**:
@@ -255,7 +255,7 @@ AW-001 (dev env)
 ---
 
 ### AW-015 — Self Code Review (Mandatory Tail)
-- **Type**: review | **Size**: S | **Deps**: AW-005..AW-014 | **Status**: `todo`
+- **Type**: review | **Size**: S | **Deps**: AW-005..AW-014 | **Status**: `todo` (2026-07-01: checklist below never actually ticked)
 - **Checklist**:
   - [ ] No `@SuppressLint` or `lint:ignore` without justification
   - [ ] All `PendingIntent` use `FLAG_IMMUTABLE`
@@ -270,7 +270,7 @@ AW-001 (dev env)
 ---
 
 ### AW-016 — Requirements Validation (Mandatory Tail)
-- **Type**: review | **Size**: S | **Deps**: AW-015 | **Status**: `todo`
+- **Type**: review | **Size**: S | **Deps**: AW-015 | **Status**: `todo` (2026-07-01: checklist below never actually ticked)
 - **Checklist**: Cross-check every acceptance criterion in spec §13 against implementation:
   - [ ] AC-1: Snooze toggle with accessibility granted
   - [ ] AC-2: Snooze toggle without accessibility
@@ -286,7 +286,7 @@ AW-001 (dev env)
 ---
 
 ### AW-017 — Full Project Verification (Mandatory Tail)
-- **Type**: review | **Size**: S | **Deps**: AW-016 | **Status**: `todo`
+- **Type**: review | **Size**: S | **Deps**: AW-016 | **Status**: `todo` (2026-07-01: no command output was ever recorded)
 - **Commands**:
   ```bash
   ./gradlew assembleDebug     # must exit 0
@@ -311,4 +311,4 @@ AW-001 (dev env)
 
 ## Rollback Point
 
-_To be recorded before Wave 1 executes:_ `git rev-parse HEAD` output goes here.
+`e9578018bfa8565beedc4fe93e6e96b151bfac2b` (2026-06-30, before any source files)

@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Scheduling -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
+    <!-- VPN + foreground service -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
+    <!-- Network state (VPN conflict check) -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Notifications: required on API 33+ for VPN foreground + accessibility failure alerts -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Custom signature permission: protects AlarmReceiver from spoofed broadcasts -->
+    <permission
+        android:name="com.mohit.snoozewhatsapp.ALARM_PERMISSION"
+        android:protectionLevel="signature" />
+    <uses-permission android:name="com.mohit.snoozewhatsapp.ALARM_PERMISSION" />
+
+    <application
+        android:name=".SnoozeWhatsAppApp"
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.SnoozeWhatsApp">
+
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.SnoozeWhatsApp">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Accessibility service: navigates WhatsApp UI to toggle Read Receipts -->
+        <service
+            android:name=".accessibility.WhatsAppAccessibilityService"
+            android:exported="true"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <!-- VPN service: blocks WhatsApp network via local tunnel -->
+        <service
+            android:name=".vpn.WhatsAppVpnService"
+            android:exported="true"
+            android:foregroundServiceType="specialUse"
+            android:permission="android.permission.BIND_VPN_SERVICE">
+            <intent-filter>
+                <action android:name="android.net.VpnService" />
+            </intent-filter>
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="WhatsApp network blocking" />
+        </service>
+
+        <!-- Quick Settings tile: Snooze (read receipts) -->
+        <service
+            android:name=".tile.SnoozeTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_snooze"
+            android:label="@string/tile_snooze_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.TOGGLEABLE_TILE"
+                android:value="true" />
+        </service>
+
+        <!-- Quick Settings tile: Offline (network block) -->
+        <service
+            android:name=".tile.OfflineTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_offline"
+            android:label="@string/tile_offline_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.TOGGLEABLE_TILE"
+                android:value="true" />
+        </service>
+
+        <!-- Boot receiver: re-registers alarms after device restart -->
+        <receiver
+            android:name=".scheduler.ScheduleReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Alarm receiver: handles custom alarm actions (not exported; AlarmManager delivers as our UID) -->
+        <receiver
+            android:name=".scheduler.AlarmReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.mohit.snoozewhatsapp.ACTION_ALARM" />
+            </intent-filter>
+        </receiver>
+
+    </application>
+
+</manifest>

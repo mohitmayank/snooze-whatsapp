@@ -12,6 +12,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -58,6 +60,7 @@ fun MainScreen() {
     var onboardingDone by remember { mutableStateOf(prefs.onboardingDone) }
     var permState by remember { mutableStateOf(checkPermissions(context)) }
     var showPermissionScreen by remember { mutableStateOf(false) }
+    var showSettingsScreen by remember { mutableStateOf(false) }
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         permState = checkPermissions(context)
@@ -73,17 +76,31 @@ fun MainScreen() {
         return
     }
 
+    if (showSettingsScreen) {
+        SettingsScreen(onBack = { showSettingsScreen = false })
+        return
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text(
-            text = stringResource(R.string.app_name),
-            style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.padding(vertical = 8.dp)
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = stringResource(R.string.app_name),
+                style = MaterialTheme.typography.headlineMedium,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+            IconButton(onClick = { showSettingsScreen = true }) {
+                Icon(Icons.Filled.Settings, contentDescription = "Settings")
+            }
+        }
 
         if (!permState.accessibilityGranted || !permState.vpnGranted) {
             Card(
@@ -175,7 +192,10 @@ fun FeatureCard(feature: Feature) {
             // Duration chips
             Text("Duration", style = MaterialTheme.typography.labelMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                val durations = listOf(30L to "30m", 60L to "1h", 120L to "2h", 240L to "4h")
+                val durations = buildList {
+                    if (prefs.showTestDurations) add(1L to "1m")
+                    addAll(listOf(30L to "30m", 60L to "1h", 120L to "2h", 240L to "4h"))
+                }
                 durations.forEach { (mins, label) ->
                     FilterChip(
                         selected = false,

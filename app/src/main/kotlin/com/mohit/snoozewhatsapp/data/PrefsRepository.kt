@@ -51,6 +51,12 @@ class PrefsRepository private constructor(private val prefs: SharedPreferences) 
         get() = prefs.getBoolean(KEY_ONBOARDING_DONE, false)
         set(v) = prefs.edit().putBoolean(KEY_ONBOARDING_DONE, v).apply()
 
+    // ── Settings ──────────────────────────────────────────────────────────────
+
+    var showTestDurations: Boolean
+        get() = prefs.getBoolean(KEY_SHOW_TEST_DURATIONS, false)
+        set(v) = prefs.edit().putBoolean(KEY_SHOW_TEST_DURATIONS, v).apply()
+
     // ── Feature dispatch helpers ──────────────────────────────────────────────
 
     fun isActive(feature: Feature): Boolean = when (feature) {
@@ -114,6 +120,7 @@ class PrefsRepository private constructor(private val prefs: SharedPreferences) 
         const val KEY_OFFLINE_DAILY_START = "offline_daily_start"
         const val KEY_OFFLINE_DAILY_END = "offline_daily_end"
         const val KEY_ONBOARDING_DONE = "onboarding_done"
+        const val KEY_SHOW_TEST_DURATIONS = "show_test_durations"
 
         const val PENDING_ENABLE = "ENABLE"
         const val PENDING_DISABLE = "DISABLE"

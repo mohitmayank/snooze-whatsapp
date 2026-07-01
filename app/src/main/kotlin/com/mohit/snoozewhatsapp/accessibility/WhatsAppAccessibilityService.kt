@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.mohit.snoozewhatsapp.R
@@ -21,10 +22,13 @@ class WhatsAppAccessibilityService : AccessibilityService() {
 
         val prefs = PrefsRepository.get(this)
         val pending = prefs.snoozePendingAction
+        Log.d(TAG, "onAccessibilityEvent: whatsapp window state changed, pending=$pending")
         if (pending.isEmpty()) return
 
-        // Cancel any previous navigation attempt and start fresh
-        navigationJob?.cancel()
+        // WhatsApp's own internal navigation (Settings → Account → Privacy) fires window-state-changed
+        // events too. Don't restart an already in-flight navigation on those — its polling loops pick up
+        // the new screen on their own. Only start a fresh job if none is currently running.
+        if (navigationJob?.isActive == true) return
         navigationJob = scope.launch {
             navigateToReadReceipts(pending == PrefsRepository.PENDING_ENABLE)
             prefs.snoozePendingAction = ""
@@ -33,26 +37,32 @@ class WhatsAppAccessibilityService : AccessibilityService() {
 
     private suspend fun navigateToReadReceipts(enable: Boolean) {
         val timeoutMs = 5_000L
-        val startTime = System.currentTimeMillis()
 
-        fun elapsed() = System.currentTimeMillis() - startTime
-        fun timedOut() = elapsed() > timeoutMs
+        Log.d(TAG, "navigateToReadReceipts: starting, enable=$enable")
 
-        // Step through: Settings → Account → Privacy → Read receipts switch
-        val steps = listOf("Settings", "Account", "Privacy")
+        // Step through: More options → Settings → Privacy → Read receipts switch
+        // "Privacy" is a top-level Settings row, a sibling of "Account" — not nested inside it.
+        // Each step gets its own fresh timeout window — screen transitions take real time on-device.
+        val steps = listOf("More options", "Settings", "Privacy")
         for (step in steps) {
-            if (!clickNodeWithText(step, startTime, timeoutMs)) {
+            if (!clickNodeWithText(step, System.currentTimeMillis(), timeoutMs)) {
+                Log.d(TAG, "navigateToReadReceipts: FAILED at step '$step'")
                 notifyFailed()
+                PrefsRepository.get(this).snoozeActive = !enable
                 return
             }
+            Log.d(TAG, "navigateToReadReceipts: clicked '$step'")
             delay(300)
         }
 
         // Find and click the Read receipts switch
-        if (!clickReadReceiptsSwitch(enable, startTime, timeoutMs)) {
+        if (!clickReadReceiptsSwitch(enable, System.currentTimeMillis(), timeoutMs)) {
+            Log.d(TAG, "navigateToReadReceipts: FAILED at Read receipts switch")
             notifyFailed()
+            PrefsRepository.get(this).snoozeActive = !enable
             return
         }
+        Log.d(TAG, "navigateToReadReceipts: clicked Read receipts switch, done")
 
         delay(500)
         // Navigate back to previous app
@@ -74,7 +84,7 @@ class WhatsAppAccessibilityService : AccessibilityService() {
         while (System.currentTimeMillis() - startTime < timeoutMs) {
             val root = rootInActiveWindow
             if (root == null) { delay(100); continue }
-            val node = findNodeByText(root, text)
+            val node = findClickableNode(root, text)
             if (node != null) {
                 node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
                 node.recycle()
@@ -87,19 +97,24 @@ class WhatsAppAccessibilityService : AccessibilityService() {
     }
 
     private suspend fun clickReadReceiptsSwitch(
-        enable: Boolean,
+        snoozeEnabled: Boolean,
         startTime: Long,
         timeoutMs: Long,
     ): Boolean {
+        // Snooze ON means Read Receipts should be OFF, and vice versa — the switch's
+        // desired checked state is the opposite of whether snooze is being enabled.
+        val desiredChecked = !snoozeEnabled
         while (System.currentTimeMillis() - startTime < timeoutMs) {
             val root = rootInActiveWindow
             if (root == null) { delay(100); continue }
             val node = findSwitchNearText(root, "Read receipts")
             if (node != null) {
                 val checked = node.isChecked
-                // Only click if current state differs from desired
-                if (checked != enable) {
-                    node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                // Only click if current state differs from desired. The Switch itself is often
+                // not clickable — WhatsApp toggles it via a clickable row ancestor instead.
+                if (checked != desiredChecked) {
+                    val target = nearestClickableAncestor(node) ?: node
+                    target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
                 }
                 node.recycle()
                 return true
@@ -110,31 +125,69 @@ class WhatsAppAccessibilityService : AccessibilityService() {
         return false
     }
 
-    private fun findNodeByText(root: AccessibilityNodeInfo, text: String): AccessibilityNodeInfo? {
-        val nodes = root.findAccessibilityNodeInfosByText(text)
-        return nodes.firstOrNull { it.isClickable || it.isEnabled }
+    /**
+     * WhatsApp's menu/list rows are often a non-clickable label inside a clickable
+     * ancestor container (e.g. a ListView row). Matching by text alone finds the label;
+     * clicking it directly is a no-op, so climb up to the nearest clickable ancestor.
+     *
+     * findAccessibilityNodeInfosByText does a case-insensitive *contains* match against both
+     * text and content-description, so unrelated elements can match (e.g. WhatsApp's account
+     * switcher has content-desc "Button to switch or add an account", which contains "account").
+     * Prefer nodes whose visible text is an exact match before falling back to loose matches.
+     */
+    private fun findClickableNode(root: AccessibilityNodeInfo, text: String): AccessibilityNodeInfo? {
+        val matches = root.findAccessibilityNodeInfosByText(text)
+        val ordered = matches.sortedByDescending { it.text?.toString().equals(text, ignoreCase = true) }
+        for (match in ordered) {
+            val clickable = nearestClickableAncestor(match)
+            if (clickable != null) return clickable
+        }
+        return null
     }
 
+    /** Returns `node` itself if clickable, else the nearest clickable ancestor, else null. */
+    private fun nearestClickableAncestor(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        var current: AccessibilityNodeInfo? = node
+        while (current != null) {
+            if (current.isClickable) return current
+            current = current.parent
+        }
+        return null
+    }
+
+    /**
+     * The label's Switch is not always a direct sibling — WhatsApp wraps the label in its own
+     * layout, one level below the row container the switch also lives in. Climb multiple
+     * ancestor levels searching each one's full subtree, and prefer the label with an exact
+     * text match (surrounding description text can also contain the search string as a substring).
+     */
     private fun findSwitchNearText(root: AccessibilityNodeInfo, text: String): AccessibilityNodeInfo? {
-        // Find the label, then look for a sibling/nearby switch
         val labels = root.findAccessibilityNodeInfosByText(text)
-        for (label in labels) {
-            val parent = label.parent ?: continue
-            for (i in 0 until parent.childCount) {
-                val child = parent.getChild(i) ?: continue
-                if (child.className?.contains("Switch", ignoreCase = true) == true ||
-                    child.className?.contains("CheckBox", ignoreCase = true) == true
-                ) {
-                    return child
-                }
-                child.recycle()
+        val ordered = labels.sortedByDescending { it.text?.toString().equals(text, ignoreCase = true) }
+        for (label in ordered) {
+            if (isSwitchOrCheckBox(label)) return label
+            var ancestor: AccessibilityNodeInfo? = label.parent
+            var depth = 0
+            while (ancestor != null && depth < 4) {
+                val switchNode = findDescendantSwitch(ancestor)
+                if (switchNode != null) return switchNode
+                ancestor = ancestor.parent
+                depth++
             }
-            // Also check the label itself if it's a switch
-            if (label.className?.contains("Switch", ignoreCase = true) == true) {
-                return label
-            }
-            label.recycle()
-            parent.recycle()
+        }
+        return null
+    }
+
+    private fun isSwitchOrCheckBox(node: AccessibilityNodeInfo): Boolean =
+        node.className?.contains("Switch", ignoreCase = true) == true ||
+            node.className?.contains("CheckBox", ignoreCase = true) == true
+
+    private fun findDescendantSwitch(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        if (isSwitchOrCheckBox(node)) return node
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val found = findDescendantSwitch(child)
+            if (found != null) return found
         }
         return null
     }
@@ -161,5 +214,9 @@ class WhatsAppAccessibilityService : AccessibilityService() {
     override fun onDestroy() {
         scope.cancel()
         super.onDestroy()
+    }
+
+    companion object {
+        private const val TAG = "SnoozeA11y"
     }
 }

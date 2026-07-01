@@ -35,13 +35,16 @@ object FeatureController {
 
     private fun triggerSnoozeToggle(context: Context, enable: Boolean) {
         val prefs = PrefsRepository.get(context)
-        prefs.snoozePendingAction = if (enable) PrefsRepository.PENDING_ENABLE else PrefsRepository.PENDING_DISABLE
         // Launch WhatsApp; AccessibilityService picks up the pending action on window focus
         val waIntent = context.packageManager.getLaunchIntentForPackage("com.whatsapp")
-        if (waIntent != null) {
-            waIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            context.startActivity(waIntent)
+        if (waIntent == null) {
+            Toast.makeText(context, context.getString(R.string.whatsapp_not_installed_error), Toast.LENGTH_LONG).show()
+            prefs.setActive(Feature.SNOOZE, !enable)
+            return
         }
+        prefs.snoozePendingAction = if (enable) PrefsRepository.PENDING_ENABLE else PrefsRepository.PENDING_DISABLE
+        waIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(waIntent)
     }
 
     private fun startVpn(context: Context) {

@@ -5,6 +5,7 @@ import android.app.AlarmManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.net.VpnService
 import android.os.Build
 import android.provider.Settings
@@ -18,7 +19,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import com.mohit.snoozewhatsapp.R
+import com.mohit.snoozewhatsapp.utils.isAccessibilityEnabled
 
 data class PermissionState(
     val accessibilityGranted: Boolean,
@@ -39,25 +43,21 @@ fun checkPermissions(context: Context): PermissionState {
     )
 }
 
-private fun isAccessibilityEnabled(context: Context): Boolean {
-    val serviceName = "${context.packageName}/.accessibility.WhatsAppAccessibilityService"
-    val enabled = Settings.Secure.getString(
-        context.contentResolver,
-        Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-    ) ?: return false
-    return enabled.split(":").any { it.equals(serviceName, ignoreCase = true) }
-}
-
 @Composable
 fun PermissionSetupScreen(onComplete: () -> Unit) {
     val context = LocalContext.current
     var state by remember { mutableStateOf(checkPermissions(context)) }
 
-    // Re-check on each recomposition triggered by lifecycle (MainActivity handles onResume)
-    LaunchedEffect(Unit) { state = checkPermissions(context) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        state = checkPermissions(context)
+    }
 
     val notifLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
+    ) { state = checkPermissions(context) }
+
+    val vpnLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
     ) { state = checkPermissions(context) }
 
     Column(
@@ -73,6 +73,21 @@ fun PermissionSetupScreen(onComplete: () -> Unit) {
         Text("Grant these permissions to enable all features.")
 
         Spacer(Modifier.height(8.dp))
+
+        PermissionRow(
+            title = stringResource(R.string.permission_restricted_settings_title),
+            description = stringResource(R.string.permission_restricted_settings_desc),
+            granted = false,
+            buttonLabel = stringResource(R.string.permission_open),
+            onGrant = {
+                context.startActivity(
+                    Intent(
+                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.parse("package:${context.packageName}")
+                    ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                )
+            }
+        )
 
         PermissionRow(
             title = stringResource(R.string.permission_accessibility_title),
@@ -92,7 +107,9 @@ fun PermissionSetupScreen(onComplete: () -> Unit) {
             onGrant = {
                 val vpnIntent = VpnService.prepare(context)
                 if (vpnIntent != null) {
-                    context.startActivity(vpnIntent.apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
+                    vpnLauncher.launch(vpnIntent)
+                } else {
+                    state = checkPermissions(context)
                 }
             }
         )
@@ -102,7 +119,6 @@ fun PermissionSetupScreen(onComplete: () -> Unit) {
                 title = stringResource(R.string.permission_alarm_title),
                 description = stringResource(R.string.permission_alarm_desc),
                 granted = state.exactAlarmGranted,
-                optional = true,
                 onGrant = {
                     context.startActivity(
                         Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
@@ -130,7 +146,7 @@ private fun PermissionRow(
     title: String,
     description: String,
     granted: Boolean,
-    optional: Boolean = false,
+    buttonLabel: String = stringResource(R.string.permission_grant),
     onGrant: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -141,7 +157,7 @@ private fun PermissionRow(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = if (optional) "$title (optional)" else title,
+                    text = title,
                     style = MaterialTheme.typography.titleSmall
                 )
                 Text(
@@ -157,7 +173,7 @@ private fun PermissionRow(
                 )
             } else {
                 Button(onClick = onGrant) {
-                    Text(stringResource(R.string.permission_grant))
+                    Text(buttonLabel)
                 }
             }
         }

@@ -10,6 +10,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,6 +19,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import com.mohit.snoozewhatsapp.R
 import com.mohit.snoozewhatsapp.data.Feature
 import com.mohit.snoozewhatsapp.data.FeatureController
@@ -46,11 +49,6 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-
-    override fun onResume() {
-        super.onResume()
-        // Trigger recomposition to re-check permission state
-    }
 }
 
 @Composable
@@ -59,11 +57,17 @@ fun MainScreen() {
     val prefs = remember { PrefsRepository.get(context) }
     var onboardingDone by remember { mutableStateOf(prefs.onboardingDone) }
     var permState by remember { mutableStateOf(checkPermissions(context)) }
+    var showPermissionScreen by remember { mutableStateOf(false) }
 
-    if (!onboardingDone) {
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        permState = checkPermissions(context)
+    }
+
+    if (!onboardingDone || showPermissionScreen) {
         PermissionSetupScreen(onComplete = {
             prefs.onboardingDone = true
             onboardingDone = true
+            showPermissionScreen = false
             permState = checkPermissions(context)
         })
         return
@@ -83,7 +87,9 @@ fun MainScreen() {
 
         if (!permState.accessibilityGranted || !permState.vpnGranted) {
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showPermissionScreen = true },
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
             ) {
                 Text(

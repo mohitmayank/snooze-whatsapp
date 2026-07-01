@@ -17,6 +17,9 @@
     <string name="duration_4h">4h</string>
     <string name="duration_custom">Custom</string>
     <string name="schedule_daily_label">Daily schedule</string>
+    <string name="permission_restricted_settings_title">Allow Restricted Settings</string>
+    <string name="permission_restricted_settings_desc">Sideloaded apps are blocked from using Accessibility until you allow it. Tap Open, then use the ⋮ menu → \"Allow restricted settings\".</string>
+    <string name="permission_open">Open</string>
     <string name="permission_accessibility_title">Accessibility Permission</string>
     <string name="permission_accessibility_desc">Allows toggling WhatsApp read receipts automatically</string>
     <string name="permission_vpn_title">VPN Permission</string>
@@ -31,6 +34,7 @@
     <string name="vpn_notification_text">WhatsApp network access is blocked. Tap to stop.</string>
     <string name="vpn_notification_channel_name">WA Offline Status</string>
     <string name="vpn_conflict_error">Another VPN is active. Disable it first to use WA Offline.</string>
+    <string name="whatsapp_not_installed_error">WhatsApp isn\'t installed.</string>
     <string name="accessibility_service_description">Navigates WhatsApp settings to toggle read receipts</string>
     <string name="snooze_failed_notification_title">WA Snooze Failed</string>
     <string name="snooze_failed_notification_text">WhatsApp UI may have changed. Open WhatsApp Settings &gt; Privacy &gt; Read Receipts manually.</string>

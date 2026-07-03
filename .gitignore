@@ -11,3 +11,7 @@ local.properties
 app/build/
 gradle-app.setting
 .absolute-work/
+
+# Release signing — never commit keys or credentials
+keystore.properties
+keystore/

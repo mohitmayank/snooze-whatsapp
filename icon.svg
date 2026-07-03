@@ -1,0 +1,26 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#25D366" />
+      <stop offset="100%" stop-color="#128C7E" />
+    </linearGradient>
+    <filter id="dropShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="2" dy="8" stdDeviation="6" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- Chat Bubble Base -->
+  <path d="M256,48 C132.3,48 32,141.1 32,256 C32,298.5 46.5,338 71.4,370.7 L48,464 L144.3,440.4 C177.3,458.1 215.3,468 256,468 C379.7,468 480,374.9 480,256 C480,137.1 379.7,48 256,48 Z" 
+        fill="url(#bgGradient)" filter="url(#dropShadow)"/>
+
+  <!-- Notification Bell (Muted/Faded in Background) -->
+  <path d="M256,128 C217.3,128 186,159.3 186,198 L186,280 L150,316 L150,336 L362,336 L362,316 L326,280 L326,198 C326,159.3 294.7,128 256,128 Z M220,350 C220,369.9 236.1,386 256,386 C275.9,386 292,369.9 292,350 L220,350 Z" 
+        fill="#FFFFFF" opacity="0.25"/>
+
+  <!-- Snooze Zzzs -->
+  <g fill="#FFFFFF" font-family="sans-serif" font-weight="bold">
+    <text x="165" y="275" font-size="95" transform="rotate(-12 165 275)">Z</text>
+    <text x="260" y="195" font-size="65" transform="rotate(-12 260 195)">z</text>
+    <text x="325" y="135" font-size="45" transform="rotate(-12 325 135)">z</text>
+  </g>
+</svg>
